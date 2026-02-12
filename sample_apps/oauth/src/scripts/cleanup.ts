@@ -88,6 +88,7 @@ function stopServer(): void {
             try {
                 execSync('FOR /F "tokens=5" %a IN (\'netstat -aon ^| find ":8888"\') DO taskkill /F /PID %a', {
                     stdio: 'ignore',
+                    shell: process.env.COMSPEC || 'cmd.exe',
                 })
                 console.log('✓ Sample server stopped (port 8888)')
             } catch {

@@ -21,10 +21,9 @@ export function loadEnvFile(): void {
     envContent.split('\n').forEach((line) => {
         const trimmed = line.trim()
         if (trimmed && !trimmed.startsWith('#')) {
-            const eqIndex = trimmed.indexOf('=')
-            if (eqIndex <= 0) return
-            const key = trimmed.slice(0, eqIndex).trim()
-            const value = trimmed.slice(eqIndex + 1).trim().replace(/^["']|["']$/g, '')
+            const [keyPart, ...valueParts] = trimmed.split('=')
+            const key = keyPart?.trim()
+            const value = valueParts.join('=').trim().replace(/^["']|["']$/g, '')
             if (key && !process.env[key]) {
                 process.env[key] = value
             }
