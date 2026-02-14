@@ -27,7 +27,7 @@ import {
   loadEnvFile,
 } from './utils'
 import { loadConfig, validateConfig } from './config'
-import { runScopeTests, parseScopes, type ScopeTestResult } from './user-management'
+import { runScopeTests, parseScopes, type ScopeTestResult } from './scope-test-runner'
 
 // Load environment variables
 loadEnvFile()

@@ -35,7 +35,7 @@ src/
 │   ├── create-oauth-app.ts    # OAuth app creation script
 │   └── cleanup.ts             # Cleanup & server management
 │
-├── user-management.ts         # Scope tests (Org, Users, User Groups, Teams)
+├── scope-test-runner.ts       # Scope test execution (Org, Users, User Groups, Teams)
 └── server.ts                   # Main Express server
 ```
 
@@ -108,7 +108,7 @@ This section describes what was built to satisfy the mentor’s scope-testing ta
    - Scopes requested at login come from the `SCOPES` env var (or the default).  
    - So you can log in with different scope combinations (e.g. only `org:read`, or `org:read user:read`, etc.) without changing code.
 
-2. **`user-management.ts`**  
+2. **`scope-test-runner.ts`**  
    - Defines scope test cases for all four areas: **Organization**, **User Management**, **User Groups**, **Teams**.  
    - For each area we test the scopes from PipesHub’s `oauth_provider/config/scopes.config.ts`:
      - **Org:** `org:read` (Get), `org:write` (Update), `org:admin` (Delete)
@@ -146,6 +146,29 @@ This section describes what was built to satisfy the mentor’s scope-testing ta
 
 **Note:** For these tests to show 401 correctly when scope is missing, the PipesHub backend must accept OAuth Bearer tokens on `/api/v1/org`, `/api/v1/users`, `/api/v1/teams`, and `/api/v1/userGroups` and enforce scopes (e.g. via OAuth scope middleware, returning 401 for insufficient scope). If those routes only accept session JWTs, every call with an OAuth token may return 401 until the backend is updated.
 
+## Scope tests (CLI)
+
+Run all scope tests with one command: **`npm test`**. Tests are split by resource (org alag, users alag, user groups alag, teams alag) and use **asserts**; one command runs every test case. They also run automatically in GitHub Actions when this app changes.
+
+**What each test file tests (scope, read, write):**
+
+| File | What it tests |
+|------|----------------|
+| `tests/org-scope-tests.test.ts` | **Org:** org read (GET), org write (PUT), org admin (DELETE) |
+| `tests/users-scope-tests.test.ts` | **Users:** user read (list, get by ID), user invite (create), user write (update), user delete |
+| `tests/user-groups-scope-tests.test.ts` | **User Groups:** usergroup read (list), usergroup write (create, update) |
+| `tests/teams-scope-tests.test.ts` | **Teams:** team read (list), team write (create, update) |
+
+Each test asserts: **with scope → 2xx or 4xx; without scope → 401.** So you can see clearly what works and what doesn’t.
+
+To run against a real backend, set in `.env` or environment:
+
+- **`BACKEND_URL`** — PipesHub backend (default `http://localhost:3000`)
+- **`ACCESS_TOKEN`** — OAuth access token (e.g. copy from the sample app after logging in)
+- **`SCOPES`** — Space-separated scopes the token has (e.g. `org:read user:read openid`)
+
+Without `ACCESS_TOKEN`, tests are skipped so `npm test` still passes (e.g. on first clone or in CI before secrets are set).
+
 ## 📜 Available Scripts
 
 | Script | Command | Description |
@@ -153,6 +176,7 @@ This section describes what was built to satisfy the mentor’s scope-testing ta
 | **Development** | `npm run dev` | Run with ts-node (auto-reload) |
 | **Build** | `npm run build` | Compile TypeScript to JavaScript |
 | **Start** | `npm start` | Build and run in production mode |
+| **Test** | `npm test` | Run OAuth scope tests (Org, Users, User Groups, Teams) |
 | **Create App** | `npm run create-app` | Create OAuth app in PipesHub |
 | **Cleanup** | `npm run cleanup` | Delete OAuth app and stop server |
 | **Stop** | `npm run stop` | Stop the server only |
