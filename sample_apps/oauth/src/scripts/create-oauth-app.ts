@@ -26,13 +26,19 @@ if (!ADMIN_JWT_TOKEN) {
     process.exit(1)
 }
 
-// OAuth app configuration
+// OAuth app configuration – allow all scopes used by scope tests (Org, Users, User Groups, Teams)
 const oauthAppConfig: OAuthAppConfig = {
     name: 'Sample OAuth Client',
     description: 'A sample application demonstrating PipesHub OAuth flow',
     redirectUris: ['http://localhost:8888/callback'],
     allowedGrantTypes: ['authorization_code', 'refresh_token'],
-    allowedScopes: ['org:read', 'user:read', 'openid', 'profile', 'email', 'offline_access'],
+    allowedScopes: [
+        'org:read', 'org:write', 'org:admin',
+        'user:read', 'user:write', 'user:invite', 'user:delete',
+        'usergroup:read', 'usergroup:write',
+        'team:read', 'team:write',
+        'openid', 'profile', 'email', 'offline_access',
+    ],
     isConfidential: true,
     accessTokenLifetime: 3600,
     refreshTokenLifetime: 2592000,

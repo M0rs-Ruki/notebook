@@ -35,6 +35,7 @@ src/
 │   ├── create-oauth-app.ts    # OAuth app creation script
 │   └── cleanup.ts             # Cleanup & server management
 │
+├── user-management.ts         # Scope tests (Org, Users, User Groups, Teams)
 └── server.ts                   # Main Express server
 ```
 
@@ -81,6 +82,8 @@ The client will run at `http://localhost:8888`.
 6. Test the API endpoints:
    - **Get Organization** - `/api/org`
    - **Get User Info** - `/api/userinfo`
+   - **Scope Tests** - `/scope-tests` (Org, Users, Teams, User Groups – verifies 401 when scope is missing)
+7. To test scope enforcement: set `SCOPES` to a subset (e.g. `SCOPES=org:read`), log in, then open **Scope Tests**. Endpoints whose scope you did not request should return **401**.
 
 ## ⚙️ Configuration
 
@@ -92,7 +95,56 @@ Configuration can be set via environment variables or a `.env` file:
 | `CLIENT_SECRET` | OAuth client secret | Required |
 | `BACKEND_URL` | PipesHub backend URL | `http://localhost:3000` |
 | `PORT` | Sample client port | `8888` |
+| `SCOPES` | Space-separated scopes to request at login | `org:read user:read openid profile email offline_access` |
 | `ADMIN_JWT_TOKEN` | Admin token for cleanup | Optional |
+
+## 📋 Task 3: Scope Testing (What Was Implemented)
+
+This section describes what was built to satisfy the mentor’s scope-testing task: **when the scope is provided, the API should work; when the scope is not provided, it should return 401.**
+
+### What Was Done
+
+1. **Configurable scopes**  
+   - Scopes requested at login come from the `SCOPES` env var (or the default).  
+   - So you can log in with different scope combinations (e.g. only `org:read`, or `org:read user:read`, etc.) without changing code.
+
+2. **`user-management.ts`**  
+   - Defines scope test cases for all four areas: **Organization**, **User Management**, **User Groups**, **Teams**.  
+   - For each area we test the scopes from PipesHub’s `oauth_provider/config/scopes.config.ts`:
+     - **Org:** `org:read` (Get), `org:write` (Update), `org:admin` (Delete)
+     - **Users:** `user:read` (List, Get by ID), `user:invite` (Create), `user:write` (Update), `user:delete` (Delete)
+     - **User Groups:** `usergroup:read` (List), `usergroup:write` (Create, Update)
+     - **Teams:** `team:read` (List), `team:write` (Create, Update)
+   - Each test calls the backend with your current token and checks: **has scope → 2xx (or 4xx if body/params invalid); no scope → 401.**
+
+3. **`/scope-tests` route**  
+   - Runs all of the above tests with the current token and shows a table: endpoint, required scope, whether your token has it, status code, pass/fail.
+
+4. **`create-oauth-app`**  
+   - The created OAuth app’s `allowedScopes` include all of the above (org, user, usergroup, team, plus openid/profile/email/offline_access).  
+   - Re-run `npm run create-app` if your app was created before this so it has the full list.
+
+### How to Test (Mentor’s Use Cases)
+
+- **“When I passed Org Read, Get Organization worked”**  
+  1. Set `SCOPES=org:read openid` (or leave default which includes `org:read`).  
+  2. Log in, open **Scope Tests**.  
+  3. **Get Organization** should pass (2xx or 4xx); others that need different scopes should show 401.
+
+- **“When I didn’t give Org Read, it should fail with Invalid Token / Insufficient Scope”**  
+  1. Set `SCOPES=user:read openid` (no `org:read`) in `.env`.  
+  2. Restart the sample app, log in again.  
+  3. Open **Scope Tests**.  
+  4. **Get Organization** should now show 401; User/Team/UserGroup endpoints that have the right scope can still pass.
+
+- **“Org Write / Org Admin: with permission it works, without it should not”**  
+  - Same idea: log in with `SCOPES=org:read org:write` and run scope tests (Update Org should pass); then log in with only `org:read` and run again (Update Org should 401).  
+  - For Delete Org, use `org:admin` in `SCOPES` to see it pass (or 4xx if body/validation fails); without `org:admin`, Delete should 401.
+
+- **User Management, User Groups, Teams**  
+  - Use different `SCOPES` combinations (e.g. only `user:read`, only `team:read`, etc.), run **Scope Tests** each time, and confirm that only the endpoints whose scope you requested pass; the rest return 401.
+
+**Note:** For these tests to show 401 correctly when scope is missing, the PipesHub backend must accept OAuth Bearer tokens on `/api/v1/org`, `/api/v1/users`, `/api/v1/teams`, and `/api/v1/userGroups` and enforce scopes (e.g. via OAuth scope middleware, returning 401 for insufficient scope). If those routes only accept session JWTs, every call with an OAuth token may return 401 until the backend is updated.
 
 ## 📜 Available Scripts
 
@@ -164,6 +216,7 @@ The sample client requests the following scopes:
 | `/logout` | GET | Clears tokens and logs out |
 | `/api/org` | GET | Test API: Get organization info using OAuth token |
 | `/api/userinfo` | GET | Test API: Get user info via OIDC /userinfo endpoint |
+| `/scope-tests` | GET | Run scope tests (Org, Users, Teams, User Groups); expect 401 when scope missing |
 | `/admin` | GET | Admin panel for app management |
 | `/admin/delete-app` | POST | Delete the OAuth application |
 | `/admin/shutdown` | POST | Stop the sample server |

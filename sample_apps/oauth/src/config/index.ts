@@ -31,6 +31,7 @@ export function loadConfig(): AppConfig {
     const port = parseInt(process.env.PORT || '8888', 10)
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000'
 
+    const defaultScopes = 'org:read user:read openid profile email offline_access'
     const config: AppConfig = {
         backend: {
             url: backendUrl,
@@ -39,7 +40,7 @@ export function loadConfig(): AppConfig {
             clientId: process.env.CLIENT_ID || '',
             clientSecret: process.env.CLIENT_SECRET || '',
             callbackUrl: `http://localhost:${port}/callback`,
-            scopes: 'org:read user:read openid profile email offline_access',
+            scopes: process.env.SCOPES || defaultScopes,
         },
         server: {
             port,

@@ -27,6 +27,7 @@ import {
   loadEnvFile,
 } from './utils'
 import { loadConfig, validateConfig } from './config'
+import { runScopeTests, parseScopes, type ScopeTestResult } from './user-management'
 
 // Load environment variables
 loadEnvFile()
@@ -90,12 +91,14 @@ console.log('Configuration:')
 console.log('  Backend URL:', config.backend.url)
 console.log('  Client ID:', maskSecret(config.oauth.clientId))
 console.log('  Callback URL:', config.oauth.callbackUrl)
+console.log('  Scopes (requested at login):', config.oauth.scopes)
 console.log('')
 
 /**
  * Home page
  */
 app.get('/', (req: Request, res: Response) => {
+  console.log('[GET /] Home page – user logged in:', !!currentUserTokens)
   if (currentUserTokens) {
     res.send(`
       <!DOCTYPE html>
@@ -130,6 +133,7 @@ app.get('/', (req: Request, res: Response) => {
         <div>
           <a href="/api/org"><button>Test API: Get Organization</button></a>
           <a href="/api/userinfo"><button>Test API: Get User Info</button></a>
+          <a href="/scope-tests"><button>Scope Tests (Org / Users / Teams / User Groups)</button></a>
           <a href="/logout"><button class="danger">Logout</button></a>
         </div>
         <br><br>
@@ -190,6 +194,8 @@ app.get('/login', (req: Request, res: Response) => {
     timestamp: Date.now(),
   })
 
+  console.log('[GET /login] Starting OAuth flow – scopes requested:', config.oauth.scopes)
+
   const authUrl = new URL('/api/v1/oauth2/authorize', config.backend.url)
   authUrl.searchParams.set('client_id', config.oauth.clientId)
   authUrl.searchParams.set('redirect_uri', config.oauth.callbackUrl)
@@ -199,7 +205,7 @@ app.get('/login', (req: Request, res: Response) => {
   authUrl.searchParams.set('code_challenge', codeChallenge)
   authUrl.searchParams.set('code_challenge_method', 'S256')
 
-  console.log('Redirecting to authorization URL:', authUrl.toString())
+  console.log('[GET /login] Redirecting to:', authUrl.toString())
   res.redirect(authUrl.toString())
 })
 
@@ -208,6 +214,7 @@ app.get('/login', (req: Request, res: Response) => {
  */
 app.get('/callback', async (req: Request, res: Response) => {
   const { code, state, error, error_description } = req.query
+  console.log('[GET /callback] OAuth callback – error?', error || 'none', 'code present?', !!code)
 
   if (error) {
     return res.send(`
@@ -226,12 +233,13 @@ app.get('/callback', async (req: Request, res: Response) => {
 
   const pending = pendingAuthorizations.get(state as string)
   if (!pending) {
+    console.log('[GET /callback] Invalid state – possible CSRF or expired session')
     return res.status(400).send('Invalid state parameter. Possible CSRF attack.')
   }
   pendingAuthorizations.delete(state as string)
 
   try {
-    console.log('Exchanging authorization code for tokens...')
+    console.log('[GET /callback] Exchanging authorization code for tokens at', config.backend.url + '/api/v1/oauth2/token')
 
     const tokenUrl = new URL('/api/v1/oauth2/token', config.backend.url)
     const tokenBody = new URLSearchParams({
@@ -257,10 +265,10 @@ app.get('/callback', async (req: Request, res: Response) => {
     }
 
     currentUserTokens = response.data
-    console.log('Successfully obtained tokens!')
+    console.log('[GET /callback] Tokens received – scopes:', currentUserTokens.scope)
     res.redirect('/')
   } catch (err) {
-    console.error('Token exchange error:', (err as Error).message)
+    console.error('[GET /callback] Token exchange failed:', (err as Error).message)
     res.send(`
       <!DOCTYPE html>
       <html>
@@ -279,6 +287,7 @@ app.get('/callback', async (req: Request, res: Response) => {
  * Test API: Get organization info
  */
 app.get('/api/org', async (req: Request, res: Response) => {
+  console.log('[GET /api/org] Request – has token?', !!currentUserTokens)
   if (!currentUserTokens) {
     return res.redirect('/')
   }
@@ -309,6 +318,7 @@ app.get('/api/org', async (req: Request, res: Response) => {
       </html>
     `)
   } catch (err) {
+    console.log('[GET /api/org] Error:', (err as Error).message)
     res.send(`Error: ${escapeHtml((err as Error).message)}`)
   }
 })
@@ -317,6 +327,7 @@ app.get('/api/org', async (req: Request, res: Response) => {
  * Test API: Get user info
  */
 app.get('/api/userinfo', async (req: Request, res: Response) => {
+  console.log('[GET /api/userinfo] Request – has token?', !!currentUserTokens)
   if (!currentUserTokens) {
     return res.redirect('/')
   }
@@ -347,6 +358,7 @@ app.get('/api/userinfo', async (req: Request, res: Response) => {
       </html>
     `)
   } catch (err) {
+    console.log('[GET /api/userinfo] Error:', (err as Error).message)
     res.send(`Error: ${escapeHtml((err as Error).message)}`)
   }
 })
@@ -355,8 +367,94 @@ app.get('/api/userinfo', async (req: Request, res: Response) => {
  * Logout
  */
 app.get('/logout', (req: Request, res: Response) => {
+  console.log('[GET /logout] Clearing tokens, redirecting to home')
   currentUserTokens = null
   res.redirect('/')
+})
+
+/**
+ * Scope tests: call Org, Users, User Groups, Teams APIs with current token.
+ * When token has required scope → expect 2xx (or 4xx if body/params missing).
+ * When token does NOT have scope → expect 401.
+ */
+app.get('/scope-tests', async (req: Request, res: Response) => {
+  console.log('[GET /scope-tests] Scope tests requested – has token?', !!currentUserTokens)
+  if (!currentUserTokens) {
+    return res.redirect('/')
+  }
+
+  const tokenScopes = parseScopes(currentUserTokens.scope)
+  console.log('[GET /scope-tests] Token scopes:', tokenScopes.join(', ') || '(none)')
+  const results: ScopeTestResult[] = await runScopeTests(
+    config.backend.url,
+    currentUserTokens.access_token,
+    tokenScopes,
+  )
+
+  const passedCount = results.filter((r) => r.passed).length
+  const totalCount = results.length
+  console.log('[GET /scope-tests] Done –', passedCount, '/', totalCount, 'tests passed')
+
+  const rows = results
+    .map(
+      (r) => `
+    <tr>
+      <td>${escapeHtml(r.case.category)}</td>
+      <td>${escapeHtml(r.case.name)}</td>
+      <td><code>${escapeHtml(r.case.method)} ${escapeHtml(r.case.path)}</code></td>
+      <td><code>${escapeHtml(r.case.requiredScope)}</code></td>
+      <td>${tokenScopes.includes(r.case.requiredScope) ? 'Yes' : 'No'}</td>
+      <td>${r.status >= 0 ? r.status : '—'}</td>
+      <td style="color: ${r.passed ? '#28a745' : '#dc3545'}">${r.passed ? '✓ Pass' : '✗ Fail'}</td>
+      <td>${escapeHtml(r.message)}</td>
+    </tr>`,
+    )
+    .join('')
+
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Scope Tests - User Management</title>
+      <style>
+        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 50px auto; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+        th { background: #f5f5f5; }
+        code { background: #e9e9e9; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+        .summary { background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 4px; margin: 15px 0; font-size: 14px; }
+        a { color: #007bff; }
+      </style>
+    </head>
+    <body>
+      <h1>Scope Tests (Org / Users / Teams / User Groups)</h1>
+      <div class="summary">
+        <strong>Result:</strong> ${passedCount} / ${totalCount} tests passed.
+        <br><strong>Token scopes:</strong> <code>${escapeHtml(currentUserTokens.scope || 'none')}</code>
+      </div>
+      <div class="info">
+        <strong>How to interpret:</strong> For each endpoint, if your token has the required scope, the API should return 2xx (or 4xx if the request is invalid). If your token does <em>not</em> have the scope, the API should return <strong>401</strong>. Use different <code>SCOPES</code> when logging in to test both cases.
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Test</th>
+            <th>Endpoint</th>
+            <th>Required scope</th>
+            <th>Has scope?</th>
+            <th>Status</th>
+            <th>Result</th>
+            <th>Message</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p><a href="/">← Back to Home</a></p>
+    </body>
+    </html>
+  `)
 })
 
 /**
