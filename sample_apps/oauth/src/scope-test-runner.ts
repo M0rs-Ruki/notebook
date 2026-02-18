@@ -1,15 +1,3 @@
-/**
- * Scope test runner: Org, Users, User Groups, Teams.
- *
- * What this file does:
- * - We call the backend API for each scope test. All those calls go through callScopeEndpoint().
- * - Test cases (which URL, which scope) live in scope-test-cases.ts.
- *
- * The rule we check:
- * - If the token has the required scope → backend may return 200, 201, 400, etc. (we treat 2xx and 4xx as OK).
- * - If the token does NOT have the scope → we expect 401 Unauthorized.
- */
-
 import { makeRequest } from './utils'
 import {
   SCOPE_TEST_CASES,
@@ -35,9 +23,6 @@ export interface ScopeTestResult {
   message: string
 }
 
-// -----------------------------------------------------------------------------
-// Helpers: get an id from the API response (backend may return string or ObjectId)
-// -----------------------------------------------------------------------------
 
 function toId(value: unknown): string | null {
   if (value == null) return null
@@ -48,10 +33,6 @@ function toId(value: unknown): string | null {
   return String(value)
 }
 
-/**
- * Backend list endpoints return different shapes: { data: [] }, { users: [] }, { teams: [] }, { userGroups: [] }.
- * We take the first item and return its id (or _id) so we can call GET-by-id or PUT with a real id.
- */
 function firstIdFromList(data: unknown): string | null {
   if (!data || typeof data !== 'object') return null
   const obj = data as Record<string, unknown>
@@ -63,10 +44,6 @@ function firstIdFromList(data: unknown): string | null {
   const id = first?.id ?? first?._id
   return id ? toId(id) : null
 }
-
-// -----------------------------------------------------------------------------
-// Fetch real IDs so paths like /api/v1/users/__USER_ID__ become /api/v1/users/abc123
-// -----------------------------------------------------------------------------
 
 export async function fetchRealIds(
   baseUrl: string,
@@ -93,10 +70,6 @@ export async function fetchRealIds(
   return { userId, groupId, teamId }
 }
 
-// -----------------------------------------------------------------------------
-// Build a map: __USER_ID__ → real id, __GROUP_ID__ → real id, etc.
-// -----------------------------------------------------------------------------
-
 export function buildPathReplace(ids: {
   userId: string | null
   groupId: string | null
@@ -109,23 +82,17 @@ export function buildPathReplace(ids: {
   }
 }
 
-// -----------------------------------------------------------------------------
-// Call the API (this is the only place we send HTTP requests for scope tests)
-// -----------------------------------------------------------------------------
-
 export async function callScopeEndpoint(
   baseUrl: string,
   accessToken: string,
   testCase: ScopeTestCase,
   pathReplace: Record<string, string>,
 ): Promise<{ status: number }> {
-  // Replace __USER_ID__ etc. in the path with real ids
   let path = testCase.path
   for (const [placeholder, realId] of Object.entries(pathReplace)) {
     path = path.replace(placeholder, realId)
   }
 
-  // Add query string if the test case needs it (e.g. ?page=1&limit=10 for list teams)
   const query = testCase.query
     ? '?' + Object.entries(testCase.query).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join('&')
     : ''
@@ -145,11 +112,6 @@ export async function callScopeEndpoint(
   return { status: res.status }
 }
 
-/**
- * Decide if this test passed and what message to show.
- * - Token has scope: 2xx or 4xx = pass (4xx means auth worked but request was bad).
- * - Token missing scope: only 401 = pass (correctly denied).
- */
 function getPassedAndMessage(hasScope: boolean, status: number): { passed: boolean; message: string } {
   if (hasScope) {
     if (status >= 200 && status < 300) return { passed: true, message: `OK (${status})` }
@@ -159,10 +121,6 @@ function getPassedAndMessage(hasScope: boolean, status: number): { passed: boole
   if (status === 401) return { passed: true, message: 'Correctly denied (401)' }
   return { passed: false, message: `Expected 401, got ${status}` }
 }
-
-// -----------------------------------------------------------------------------
-// Run all scope tests (used by the /scope-tests page in the app)
-// -----------------------------------------------------------------------------
 
 export async function runScopeTests(
   backendUrl: string,
@@ -193,10 +151,6 @@ export async function runScopeTests(
 
   return results
 }
-
-// -----------------------------------------------------------------------------
-// Parse a scope string like "org:read user:write" into ["org:read", "user:write"]
-// -----------------------------------------------------------------------------
 
 export function parseScopes(scopeString: string): string[] {
   if (!scopeString?.trim()) return []

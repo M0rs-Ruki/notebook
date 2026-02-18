@@ -1,7 +1,3 @@
-/**
- * OAuth scope test case definitions: Org, Users, User Groups, Teams.
- * Used by both the test suite (tests/*.test.ts) and the server’s GET /scope-tests route.
- */
 
 export const PLACEHOLDER_USER_ID = '__USER_ID__'
 export const PLACEHOLDER_GROUP_ID = '__GROUP_ID__'
@@ -18,7 +14,6 @@ export interface ScopeTestCase {
   body?: string
 }
 
-// --- Organization (org:read, org:write, org:admin) ---
 export const ORG_TEST_CASES: ScopeTestCase[] = [
   {
     id: 'org-get',
@@ -46,7 +41,6 @@ export const ORG_TEST_CASES: ScopeTestCase[] = [
   },
 ]
 
-// --- Users (user:read, user:invite, user:write, user:delete) ---
 export const USERS_TEST_CASES: ScopeTestCase[] = [
   {
     id: 'users-list',
@@ -71,7 +65,7 @@ export const USERS_TEST_CASES: ScopeTestCase[] = [
     path: '/api/v1/users',
     requiredScope: 'user:invite',
     category: 'Users',
-    body: '{"fullName":"Scope Test User","email":"scope-test@example.com"}',
+    body: '{"fullName":"User","email":"user@example.com"}',
   },
   {
     id: 'users-put-id',
@@ -80,7 +74,7 @@ export const USERS_TEST_CASES: ScopeTestCase[] = [
     path: `/api/v1/users/${PLACEHOLDER_USER_ID}`,
     requiredScope: 'user:write',
     category: 'Users',
-    body: '{"fullName":"Scope Test User Updated"}',
+    body: '{"fullName":"User Updated"}',
   },
   {
     id: 'users-delete-id',
@@ -92,7 +86,6 @@ export const USERS_TEST_CASES: ScopeTestCase[] = [
   },
 ]
 
-// --- User Groups (usergroup:read, usergroup:write) ---
 export const USER_GROUPS_TEST_CASES: ScopeTestCase[] = [
   {
     id: 'usergroups-list',
@@ -109,7 +102,7 @@ export const USER_GROUPS_TEST_CASES: ScopeTestCase[] = [
     path: '/api/v1/userGroups',
     requiredScope: 'usergroup:write',
     category: 'User Groups',
-    body: '{"name":"Scope Test Group","type":"default"}',
+    body: '{"name":"Group","type":"default"}',
   },
   {
     id: 'usergroups-put-id',
@@ -118,11 +111,10 @@ export const USER_GROUPS_TEST_CASES: ScopeTestCase[] = [
     path: `/api/v1/userGroups/${PLACEHOLDER_GROUP_ID}`,
     requiredScope: 'usergroup:write',
     category: 'User Groups',
-    body: '{"name":"Scope Test Group Updated","type":"default"}',
+    body: '{"name":"Group Updated","type":"default"}',
   },
 ]
 
-// --- Teams (team:read, team:write) ---
 export const TEAMS_TEST_CASES: ScopeTestCase[] = [
   {
     id: 'teams-list',
@@ -140,7 +132,7 @@ export const TEAMS_TEST_CASES: ScopeTestCase[] = [
     path: '/api/v1/teams',
     requiredScope: 'team:write',
     category: 'Teams',
-    body: '{"name":"Scope Test Team"}',
+    body: '{"name":"Team"}',
   },
   {
     id: 'teams-put-id',
@@ -149,7 +141,7 @@ export const TEAMS_TEST_CASES: ScopeTestCase[] = [
     path: `/api/v1/teams/${PLACEHOLDER_TEAM_ID}`,
     requiredScope: 'team:write',
     category: 'Teams',
-    body: '{"name":"Scope Test Team Updated"}',
+    body: '{"name":"Team Updated"}',
   },
 ]
 

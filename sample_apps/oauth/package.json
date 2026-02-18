@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "npm run build && node dist/server.js",
     "dev": "ts-node src/server.ts",
-    "test": "vitest run",
+    "test": "python3 scripts/run_tests_with_auth.py",
     "create-app": "ts-node src/scripts/create-oauth-app.ts",
     "cleanup": "ts-node src/scripts/cleanup.ts",
     "stop": "ts-node src/scripts/cleanup.ts --stop-only",
@@ -22,7 +22,6 @@
     "@types/express": "^4.17.21",
     "@types/node": "^20.10.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3",
-    "vitest": "^2.0.0"
+    "typescript": "^5.3.3"
   }
 }

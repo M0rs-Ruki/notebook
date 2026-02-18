@@ -95,6 +95,21 @@ console.log('  Scopes (requested at login):', config.oauth.scopes)
 console.log('')
 
 /**
+ * API endpoint to get current token (for test automation)
+ */
+app.get('/api/token', (req: Request, res: Response) => {
+  if (!currentUserTokens) {
+    return res.status(404).json({ error: 'No token available. Please log in first.' })
+  }
+  res.json({
+    access_token: currentUserTokens.access_token,
+    token_type: currentUserTokens.token_type,
+    scope: currentUserTokens.scope,
+    expires_in: currentUserTokens.expires_in,
+  })
+})
+
+/**
  * Home page
  */
 app.get('/', (req: Request, res: Response) => {
