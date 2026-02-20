@@ -3,6 +3,7 @@
 .DS_Store
 # Node modules
 node_modules/
-
+dist/
 # Logs
 *.log
+__pycache__/
